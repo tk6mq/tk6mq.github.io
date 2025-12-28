@@ -408,8 +408,7 @@
                 div.style.width = `${size}px`;
                 div.style.height = `${size}px`;
                 div.style.backgroundColor = item.color;
-                
-                // ★ここで丸ごとのクリックイベントを設定
+            
                 div.onclick = (e) => handleMainClick(e, item.id);
 
                 div.innerHTML = `
@@ -445,4 +444,5 @@
         }
     </script>
 </body>
+
 </html>

@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#f5f5f5" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
+    <title>Tap Counter Ultimate</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* --- テーマ変数 --- */
+        :root {
+            --bg-color: #f0f2f5;
+            --text-color: #333;
+            --panel-bg: rgba(255, 255, 255, 0.95);
+            --shadow-color: rgba(0,0,0,0.15);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #121212;
+                --text-color: #eee;
+                --panel-bg: rgba(30, 30, 30, 0.95);
+                --shadow-color: rgba(0,0,0,0.5);
+            }
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding-top: 80px;
+            padding-bottom: 50px;
+        }
+
+        /* --- メニューバー --- */
+        .app-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 2px 8px var(--shadow-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            z-index: 1000;
+        }
+
+        .menu-btn {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 0.9rem;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+        .menu-btn i { font-size: 1.1rem; }
+
+        /* --- カウンター配置エリア --- */
+        #counter-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            width: 100%;
+            max-width: 1200px;
+            padding: 20px;
+        }
+
+        /* --- 丸いカウンター本体 --- */
+        .circle-counter {
+            position: relative;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            user-select: none;
+            box-shadow: 0 6px 15px var(--shadow-color);
+            cursor: pointer; /* 押せる感を出す */
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+            
+            /* ★重要：弾むようなアニメーション設定 */
+            transition: 
+                width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+                height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                background-color 0.3s;
+        }
+
+        /* 押した瞬間の沈み込み */
+        .circle-counter:active {
+            transform: scale(0.96);
+            transition: transform 0.1s;
+        }
+
+        /* 中身の要素（クリックを透過させない部分は pointer-events: auto） */
+        .counter-inner {
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            pointer-events: none; /* 基本は親のクリック（+1）を優先 */
+        }
+
+        .counter-name {
+            font-size: 0.9rem;
+            margin-bottom: 2px;
+            border-bottom: 1px dotted rgba(255,255,255,0.6);
+            cursor: pointer;
+            pointer-events: auto; /* 名前編集は独立 */
+            max-width: 80%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .count-display {
+            font-size: 3rem;
+            font-weight: 800;
+            margin: 0;
+            line-height: 1.2;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            /* 数値クリックは親（+1）に任せるので pointer-events は none のまま */
+        }
+
+        /* --- 下部の操作ボタン群 --- */
+        .actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+            pointer-events: auto; /* ここは親の+1を及ぼさない */
+        }
+
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.6);
+            background: rgba(0,0,0,0.1);
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            transition: background 0.2s;
+        }
+        .action-btn:active { background: rgba(255,255,255,0.3); }
+
+        /* --- ツールボタン（削除・色） --- */
+        .tool-btn {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.2);
+            border: none;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 10;
+            transition: background 0.2s;
+            pointer-events: auto; /* 独立してクリック可能にする */
+        }
+        .tool-btn:hover { background: rgba(0,0,0,0.4); }
+        .btn-delete { top: 15%; right: 15%; }
+        .btn-color { top: 15%; left: 15%; }
+
+        .color-picker-hidden {
+            position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;
+        }
+
+        /* --- リップルエフェクト --- */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            animation: ripple-anim 0.5s linear;
+            background-color: rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+        }
+        @keyframes ripple-anim {
+            to { transform: scale(3); opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <nav class="app-bar">
+        <button class="menu-btn" onclick="addCounterWithRipple(event)">
+            <i class="fas fa-plus"></i> 追加
+        </button>
+        <button class="menu-btn" onclick="exportCSVWithRipple(event)">
+            <i class="fas fa-file-csv"></i> Excel
+        </button>
+        <button class="menu-btn" onclick="resetAllWithRipple(event)">
+            <i class="fas fa-trash-alt"></i> リセット
+        </button>
+    </nav>
+
+    <div id="counter-container"></div>
+
+    <script>
+        // 設定
+        const BASE_SIZE = 180;
+        const GROWTH_RATE = 2.0; 
+        const MAX_SIZE = 340;    
+
+        let counters = [];
+
+        window.onload = () => {
+            const saved = localStorage.getItem('ultimateCounterData');
+            if (saved) {
+                counters = JSON.parse(saved);
+            } else {
+                addCounter();
+            }
+            render();
+        };
+
+        function saveData() {
+            localStorage.setItem('ultimateCounterData', JSON.stringify(counters));
+        }
+
+        function getRandomColor() {
+            const colors = ['#F44336', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3', '#009688', '#4CAF50', '#FF9800', '#FF5722', '#607D8B'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // --- リップル生成 ---
+        function createRipple(event, element) {
+            const circle = document.createElement("span");
+            const diameter = Math.max(element.clientWidth, element.clientHeight);
+            const radius = diameter / 2;
+            const rect = element.getBoundingClientRect();
+            
+            // タッチ座標またはマウス座標
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+
+            // タップ位置が取得できない場合（キーボード操作など）のフォールバック
+            const x = (clientX ? clientX : rect.left + radius) - rect.left - radius;
+            const y = (clientY ? clientY : rect.top + radius) - rect.top - radius;
+
+            circle.style.width = circle.style.height = `${diameter}px`;
+            circle.style.left = `${x}px`;
+            circle.style.top = `${y}px`;
+            circle.classList.add("ripple");
+
+            const existing = element.getElementsByClassName("ripple")[0];
+            if (existing) existing.remove();
+            
+            element.appendChild(circle);
+        }
+
+        // --- アクション ---
+
+        // メニューボタン用ラッパー
+        function addCounterWithRipple(e) { createRipple(e, e.currentTarget); addCounter(); }
+        function exportCSVWithRipple(e) { createRipple(e, e.currentTarget); exportCSV(); }
+        function resetAllWithRipple(e) { createRipple(e, e.currentTarget); resetAll(); }
+
+        function addCounter() {
+            counters.push({
+                id: Date.now(),
+                name: `項目 ${counters.length + 1}`,
+                count: 0,
+                color: getRandomColor()
+            });
+            saveData();
+            render();
+            setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100);
+        }
+
+        // ★メイン機能：丸タップでカウントアップ
+        function handleMainClick(e, id) {
+            // 色変更や削除ボタンなどを押した時はここに到達しないように各ボタンで stopPropagation している
+            createRipple(e, e.currentTarget);
+            
+            const item = counters.find(c => c.id === id);
+            if(item) {
+                item.count++;
+                saveData();
+                render();
+                // 心地よい振動
+                if(navigator.vibrate) navigator.vibrate(25);
+            }
+        }
+
+        // マイナスボタン
+        function decreaseCount(e, id) {
+            e.stopPropagation(); // 親（+1）を発火させない
+            createRipple(e, e.currentTarget);
+            
+            const item = counters.find(c => c.id === id);
+            if(item) {
+                item.count--;
+                saveData();
+                render();
+                if(navigator.vibrate) navigator.vibrate(15);
+            }
+        }
+
+        // ★新機能：数値直接編集ボタン
+        function editValue(e, id) {
+            e.stopPropagation(); // 親（+1）を発火させない
+            createRipple(e, e.currentTarget);
+
+            const item = counters.find(c => c.id === id);
+            let val = prompt("数値を入力してください", item.count);
+            if(val !== null && !isNaN(val) && val.trim() !== "") {
+                item.count = parseInt(val);
+                saveData();
+                render();
+            }
+        }
+
+        // 名前編集
+        function editName(e, id) {
+            e.stopPropagation();
+            const item = counters.find(c => c.id === id);
+            let name = prompt("項目名を変更", item.name);
+            if(name && name.trim() !== "") {
+                item.name = name;
+                saveData();
+                render();
+            }
+        }
+
+        function deleteCounter(e, id) {
+            e.stopPropagation();
+            if(confirm('削除しますか？')) {
+                counters = counters.filter(c => c.id !== id);
+                saveData();
+                render();
+            }
+        }
+
+        function triggerColor(e, id) {
+            e.stopPropagation();
+            document.getElementById(`color-${id}`).click();
+        }
+
+        function updateColor(id, hex) {
+            const item = counters.find(c => c.id === id);
+            if(item) {
+                item.color = hex;
+                saveData();
+                render();
+            }
+        }
+
+        function exportCSV() {
+            let csv = "\uFEFF項目名,カウント,色\n";
+            counters.forEach(c => csv += `${c.name},${c.count},${c.color}\n`);
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8;'}));
+            link.download = `Count_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+        }
+
+        function resetAll() {
+            if(confirm('全データをリセットしますか？')) {
+                counters = [];
+                addCounter();
+                saveData();
+                render();
+            }
+        }
+
+        // --- 描画 ---
+        function render() {
+            const container = document.getElementById('counter-container');
+            container.innerHTML = '';
+
+            counters.forEach(item => {
+                // サイズ計算
+                let size = BASE_SIZE + (Math.abs(item.count) * GROWTH_RATE);
+                if(size > MAX_SIZE) size = MAX_SIZE;
+
+                const div = document.createElement('div');
+                div.className = 'circle-counter';
+                div.style.width = `${size}px`;
+                div.style.height = `${size}px`;
+                div.style.backgroundColor = item.color;
+                
+                // ★ここで丸ごとのクリックイベントを設定
+                div.onclick = (e) => handleMainClick(e, item.id);
+
+                div.innerHTML = `
+                    <button class="tool-btn btn-color" onclick="triggerColor(event, ${item.id})">
+                        <i class="fas fa-palette"></i>
+                    </button>
+                    <button class="tool-btn btn-delete" onclick="deleteCounter(event, ${item.id})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <input type="color" id="color-${item.id}" class="color-picker-hidden" 
+                           value="${item.color}" onchange="updateColor(${item.id}, this.value)">
+
+                    <div class="counter-inner">
+                        <div class="counter-name" onclick="editName(event, ${item.id})">${item.name}</div>
+                        
+                        <div class="count-display" style="font-size: ${size * 0.28}px">
+                             ${item.count}
+                        </div>
+                        
+                        <div class="actions">
+                            <button class="action-btn" onclick="decreaseCount(event, ${item.id})">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            
+                            <button class="action-btn" onclick="editValue(event, ${item.id})">
+                                <i class="fas fa-keyboard"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>
